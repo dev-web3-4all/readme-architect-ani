@@ -1,20 +1,29 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
+# README Architect (v1)
 
-# Run and deploy your AI Studio app
+AI-powered professional README generator and auditor for developers.
 
-This contains everything you need to run your app locally.
+## Features
 
-View your app in AI Studio: https://ai.studio/apps/703b3850-1c4e-453e-990a-3daaf468edc1
+- **AI Generation**: High-quality README generation using Gemini 3.
+- **Technical Auditor**: A rigorous review mode that evaluates clarity, coherence, and utility, providing feedback and an improved version.
+- **Prompt Strategy**: Versioned prompts for iterative improvement and evaluation.
+- **Technical UI**: A mission-control dashboard designed for developers.
 
-## Run Locally
+## Architecture
 
-**Prerequisites:**  Node.js
+- **Frontend**: React 19, Vite, Tailwind CSS 4.
+- **AI Service**: Gemini API (@google/genai).
+- **UI Components**: shadcn/ui.
 
+## Prompt Strategy
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+We use a versioned prompt strategy to ensure documentation quality:
+- `src/prompts/readmePrompts.ts`: Contains the logic for building generation and audit prompts.
+
+## Roadmap
+
+See [docs/roadmap.md](docs/roadmap.md) for future plans.
+
+## License
+
+MIT

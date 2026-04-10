@@ -11,7 +11,9 @@ import {
   Layout, 
   Info,
   ChevronRight,
-  RotateCcw
+  RotateCcw,
+  ShieldCheck,
+  Eye
 } from 'lucide-react';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -25,13 +27,15 @@ import { Separator } from '@/components/ui/separator';
 import { Toaster } from '@/components/ui/sonner';
 import { toast } from 'sonner';
 import { MarkdownPreview } from '@/components/MarkdownPreview';
-import { generateReadme, ReadmeData } from '@/services/geminiService';
+import { generateReadme, auditReadme, ReadmeData } from '@/services/geminiService';
 
 const INITIAL_DATA: ReadmeData = {
   projectName: '',
   description: '',
+  projectType: 'Web Application',
   features: '',
   technologies: '',
+  technicalDecisions: '',
   installation: '',
   usage: '',
   license: 'MIT',
@@ -40,9 +44,12 @@ const INITIAL_DATA: ReadmeData = {
 export default function App() {
   const [formData, setFormData] = useState<ReadmeData>(INITIAL_DATA);
   const [generatedMarkdown, setGeneratedMarkdown] = useState<string>('');
+  const [auditResult, setAuditResult] = useState<string>('');
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isAuditing, setIsAuditing] = useState(false);
   const [isCopied, setIsCopied] = useState(false);
   const [activeTab, setActiveTab] = useState('editor');
+  const [previewMode, setPreviewMode] = useState<'readme' | 'audit'>('readme');
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -59,6 +66,8 @@ export default function App() {
     try {
       const markdown = await generateReadme(formData);
       setGeneratedMarkdown(markdown);
+      setAuditResult('');
+      setPreviewMode('readme');
       toast.success('README generated successfully!');
       if (window.innerWidth < 1024) {
         setActiveTab('preview');
@@ -67,6 +76,28 @@ export default function App() {
       toast.error(error instanceof Error ? error.message : 'Failed to generate README');
     } finally {
       setIsGenerating(false);
+    }
+  };
+
+  const handleAudit = async () => {
+    if (!generatedMarkdown) {
+      toast.error('Generate a README first before auditing.');
+      return;
+    }
+
+    setIsAuditing(true);
+    try {
+      const result = await auditReadme(generatedMarkdown);
+      setAuditResult(result);
+      setPreviewMode('audit');
+      toast.success('Audit completed!');
+      if (window.innerWidth < 1024) {
+        setActiveTab('preview');
+      }
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to audit README');
+    } finally {
+      setIsAuditing(false);
     }
   };
 
@@ -151,16 +182,35 @@ export default function App() {
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="grid gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="projectName" className="text-zinc-300">Project Name</Label>
-                  <Input 
-                    id="projectName"
-                    name="projectName"
-                    placeholder="e.g. Awesome App"
-                    value={formData.projectName}
-                    onChange={handleInputChange}
-                    className="bg-zinc-950 border-zinc-800 focus:ring-zinc-700"
-                  />
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="projectName" className="text-zinc-300">Project Name</Label>
+                    <Input 
+                      id="projectName"
+                      name="projectName"
+                      placeholder="e.g. Awesome App"
+                      value={formData.projectName}
+                      onChange={handleInputChange}
+                      className="bg-zinc-950 border-zinc-800 focus:ring-zinc-700"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="projectType" className="text-zinc-300">Project Type</Label>
+                    <select
+                      id="projectType"
+                      name="projectType"
+                      value={formData.projectType}
+                      onChange={(e) => setFormData(prev => ({ ...prev, projectType: e.target.value }))}
+                      className="flex h-8 w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-1 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-zinc-500 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-zinc-700 disabled:cursor-not-allowed disabled:opacity-50 text-zinc-300"
+                    >
+                      <option value="Web Application">Web Application</option>
+                      <option value="Mobile App">Mobile App</option>
+                      <option value="CLI Tool">CLI Tool</option>
+                      <option value="Library/Package">Library/Package</option>
+                      <option value="API Service">API Service</option>
+                      <option value="Game">Game</option>
+                    </select>
+                  </div>
                 </div>
                 
                 <div className="space-y-2">
@@ -171,7 +221,7 @@ export default function App() {
                     placeholder="What does this project do?"
                     value={formData.description}
                     onChange={handleInputChange}
-                    className="bg-zinc-950 border-zinc-800 min-h-[100px] focus:ring-zinc-700"
+                    className="bg-zinc-950 border-zinc-800 min-h-[80px] focus:ring-zinc-700"
                   />
                 </div>
 
@@ -208,16 +258,28 @@ export default function App() {
                     placeholder="List main features (one per line)..."
                     value={formData.features}
                     onChange={handleInputChange}
-                    className="bg-zinc-950 border-zinc-800 min-h-[80px] focus:ring-zinc-700"
+                    className="bg-zinc-950 border-zinc-800 min-h-[60px] focus:ring-zinc-700"
                   />
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="installation" className="text-zinc-300">Installation (Optional)</Label>
+                  <Label htmlFor="technicalDecisions" className="text-zinc-300">Technical Decisions</Label>
+                  <Textarea 
+                    id="technicalDecisions"
+                    name="technicalDecisions"
+                    placeholder="Why did you choose these tools?"
+                    value={formData.technicalDecisions}
+                    onChange={handleInputChange}
+                    className="bg-zinc-950 border-zinc-800 min-h-[60px] focus:ring-zinc-700"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="installation" className="text-zinc-300">How to Run</Label>
                   <Input 
                     id="installation"
                     name="installation"
-                    placeholder="npm install..."
+                    placeholder="e.g. npm install && npm start"
                     value={formData.installation}
                     onChange={handleInputChange}
                     className="bg-zinc-950 border-zinc-800 focus:ring-zinc-700"
@@ -225,29 +287,47 @@ export default function App() {
                 </div>
               </div>
 
-              <Button 
-                onClick={handleGenerate} 
-                disabled={isGenerating}
-                className="w-full bg-white text-black hover:bg-zinc-200 h-12 text-lg font-bold transition-all active:scale-[0.98]"
-              >
-                {isGenerating ? (
-                  <>
-                    <motion.div
-                      animate={{ rotate: 360 }}
-                      transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                      className="mr-2"
-                    >
-                      <Sparkles className="w-5 h-5" />
-                    </motion.div>
-                    Architecting...
-                  </>
-                ) : (
-                  <>
-                    <Sparkles className="w-5 h-5 mr-2" />
-                    Generate README
-                  </>
-                )}
-              </Button>
+              <div className="grid grid-cols-2 gap-4">
+                <Button 
+                  onClick={handleGenerate} 
+                  disabled={isGenerating || isAuditing}
+                  className="bg-white text-black hover:bg-zinc-200 h-12 text-md font-bold transition-all active:scale-[0.98]"
+                >
+                  {isGenerating ? (
+                    <>
+                      <motion.div animate={{ rotate: 360 }} transition={{ duration: 1, repeat: Infinity, ease: "linear" }} className="mr-2">
+                        <Sparkles className="w-4 h-4" />
+                      </motion.div>
+                      Generating...
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="w-4 h-4 mr-2" />
+                      Generate
+                    </>
+                  )}
+                </Button>
+                <Button 
+                  onClick={handleAudit} 
+                  disabled={isAuditing || isGenerating || !generatedMarkdown}
+                  variant="secondary"
+                  className="h-12 text-md font-bold transition-all active:scale-[0.98] border border-zinc-700"
+                >
+                  {isAuditing ? (
+                    <>
+                      <motion.div animate={{ rotate: 360 }} transition={{ duration: 1, repeat: Infinity, ease: "linear" }} className="mr-2">
+                        <ShieldCheck className="w-4 h-4" />
+                      </motion.div>
+                      Auditing...
+                    </>
+                  ) : (
+                    <>
+                      <ShieldCheck className="w-4 h-4 mr-2" />
+                      Audit
+                    </>
+                  )}
+                </Button>
+              </div>
             </CardContent>
           </Card>
 
@@ -262,16 +342,36 @@ export default function App() {
         {/* Right Column: Preview */}
         <div className={`flex flex-col gap-4 h-[calc(100vh-12rem)] min-h-[500px] ${activeTab === 'editor' ? 'hidden lg:flex' : 'flex'}`}>
           <div className="flex items-center justify-between mb-2">
-            <div className="flex items-center gap-2">
-              <FileText className="w-5 h-5 text-zinc-400" />
-              <h2 className="font-display font-bold text-lg">Live Preview</h2>
+            <div className="flex items-center gap-4">
+              <button 
+                onClick={() => setPreviewMode('readme')}
+                className={cn(
+                  "flex items-center gap-2 pb-2 border-b-2 transition-all",
+                  previewMode === 'readme' ? "border-white text-white" : "border-transparent text-zinc-500 hover:text-zinc-300"
+                )}
+              >
+                <FileText className="w-4 h-4" />
+                <span className="font-display font-bold text-sm">README</span>
+              </button>
+              {auditResult && (
+                <button 
+                  onClick={() => setPreviewMode('audit')}
+                  className={cn(
+                    "flex items-center gap-2 pb-2 border-b-2 transition-all",
+                    previewMode === 'audit' ? "border-white text-white" : "border-transparent text-zinc-500 hover:text-zinc-300"
+                  )}
+                >
+                  <ShieldCheck className="w-4 h-4" />
+                  <span className="font-display font-bold text-sm">Audit Results</span>
+                </button>
+              )}
             </div>
             <div className="flex items-center gap-2">
               <Button 
                 variant="outline" 
                 size="sm" 
                 onClick={handleCopy}
-                disabled={!generatedMarkdown}
+                disabled={!generatedMarkdown && !auditResult}
                 className="border-zinc-800 bg-zinc-950 hover:bg-zinc-900 text-zinc-300"
               >
                 {isCopied ? <Check className="w-4 h-4 mr-2" /> : <Copy className="w-4 h-4 mr-2" />}
@@ -292,30 +392,42 @@ export default function App() {
 
           <div className="flex-1 relative group">
             <AnimatePresence mode="wait">
-              {generatedMarkdown ? (
+              {previewMode === 'readme' ? (
+                generatedMarkdown ? (
+                  <motion.div
+                    key="preview"
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
+                    className="h-full"
+                  >
+                    <MarkdownPreview content={generatedMarkdown} />
+                  </motion.div>
+                ) : (
+                  <motion.div
+                    key="empty"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    className="h-full border border-dashed border-zinc-800 rounded-lg flex flex-col items-center justify-center text-zinc-600 p-8 text-center"
+                  >
+                    <div className="w-16 h-16 rounded-full bg-zinc-900 flex items-center justify-center mb-4">
+                      <Sparkles className="w-8 h-8 opacity-20" />
+                    </div>
+                    <h3 className="text-lg font-medium text-zinc-400 mb-2">No Content Yet</h3>
+                    <p className="max-w-xs text-sm">
+                      Fill out the form and click generate to see your professional README here.
+                    </p>
+                  </motion.div>
+                )
+              ) : (
                 <motion.div
-                  key="preview"
+                  key="audit"
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -10 }}
                   className="h-full"
                 >
-                  <MarkdownPreview content={generatedMarkdown} />
-                </motion.div>
-              ) : (
-                <motion.div
-                  key="empty"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  className="h-full border border-dashed border-zinc-800 rounded-lg flex flex-col items-center justify-center text-zinc-600 p-8 text-center"
-                >
-                  <div className="w-16 h-16 rounded-full bg-zinc-900 flex items-center justify-center mb-4">
-                    <Sparkles className="w-8 h-8 opacity-20" />
-                  </div>
-                  <h3 className="text-lg font-medium text-zinc-400 mb-2">No Content Yet</h3>
-                  <p className="max-w-xs text-sm">
-                    Fill out the form and click generate to see your professional README here.
-                  </p>
+                  <MarkdownPreview content={auditResult} />
                 </motion.div>
               )}
             </AnimatePresence>
@@ -349,9 +461,10 @@ export default function App() {
       <footer className="border-t border-zinc-800 py-6 mt-auto">
         <div className="max-w-7xl mx-auto px-4 flex flex-col md:flex-row items-center justify-between gap-4">
           <p className="text-zinc-500 text-sm font-mono">
-            &copy; 2026 README Architect. 
+            &copy; 2026 README Architect. Licensed under MIT.
           </p>
           <div className="flex items-center gap-6">
+            <a href="/LICENSE" target="_blank" rel="noreferrer" className="text-zinc-500 hover:text-zinc-300 text-sm transition-colors">License</a>
             <a href="#" className="text-zinc-500 hover:text-zinc-300 text-sm transition-colors">Terms</a>
             <a href="#" className="text-zinc-500 hover:text-zinc-300 text-sm transition-colors">Privacy</a>
             <a href="#" className="text-zinc-500 hover:text-zinc-300 text-sm transition-colors flex items-center gap-1">
