@@ -30,6 +30,7 @@ import { MarkdownPreview } from '@/components/MarkdownPreview';
 import { generateReadme, auditReadme, ReadmeData } from '@/services/geminiService';
 
 const INITIAL_DATA: ReadmeData = {
+  mode: 'project',
   projectName: '',
   description: '',
   projectType: 'Web Application',
